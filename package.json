@@ -1,0 +1,27 @@
+{
+	"name": "sactify",
+	"version": "0.1.0",
+	"description": "Build CSS using Sactory's style builder",
+	"main": "build.js",
+	"scripts": {
+		"build": "node ./build.js"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/sactory/sactify.git"
+	},
+	"keywords": [
+		"sactory",
+		"css"
+	],
+	"author": "Mark White",
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/sactory/sactify/issues"
+	},
+	"homepage": "https://github.com/sactory/sactify#readme",
+	"dependencies": {
+		"fs-extra": "^8.0.1",
+		"sactory": "^0.102.0"
+	}
+}

@@ -69,8 +69,11 @@ function compile() {
 				content += element.textContent;
 			}
 		});
+		var json = JSON.stringify(data);
 		fs.writeFile(path.join(output, name + ".css"), content, () => {});
-		fs.writeFile(path.join(output, name + ".json"), JSON.stringify(data), () => {});
+		fs.writeFile(path.join(output, name + ".json"), json, () => {});
+		fs.writeFile(path.join(output, name + ".js"), "var " + name + "=" + json + ";", () => {});
+		fs.writeFile(path.join(output, name + ".require.js"), "define([], " + json + ");", () => {});
 	});
 }
 

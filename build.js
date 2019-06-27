@@ -9,38 +9,63 @@ var output = process.argv[3] || (input + "/dist");
 
 if(!input) throw new Error("No input path specified.");
 
+var dist = path.join(__dirname, "dist");
+
 // init sactory
 Sactory.createDocument();
+
+// create or empty cache folder
+fs.emptyDirSync(dist);
 
 // create or empty output folder
 fs.emptyDirSync(output);
 
 // prepare config
-try {
-	// transpile if needed
-	var filename = path.join(input, "sactify.jsb");
-	var jsb = fs.readFileSync(filename, "utf8");
-	fs.writeFileSync(path.join(input, "sactify.js"), new Transpiler({filename}).transpile(jsb).source.all);
-} catch(e) {}
-var config = require(input + "/sactify");
-var args = Object.keys(config).filter(a => a != "bundles").join(", ");
+var config = (function(){
+	try {
+		// transpile if needed
+		var filename = path.join(input, "sactify.jsb");
+		var jsb = fs.readFileSync(filename, "utf8");
+		fs.writeFileSync(path.join(dist, "sactify.js"), new Transpiler({filename}).transpile(jsb).source.all);
+		var ret = require(path.join(dist, "sactify"));
+		fs.unlink(path.join(dist, "sactify.js"), () => {});
+		return ret;
+	} catch(e) {
+		return require(path.join(process.cwd(), input, "sactify"));
+	}
+})();
+var args = {};
+Object.keys(config).forEach(value => args[value] = 0);
+Object.values(config.bundles).forEach(bundle => {
+	if(typeof bundle == "object") {
+		Object.keys(bundle).forEach(value => args[value] = 0);
+	}
+});
+delete args.bundles;
+args = Object.keys(args).join(", ");
+
+function getPaths(bundle) {
+	if(bundle instanceof RegExp) return bundle;
+	else if(bundle instanceof Array) return new RegExp("^(" + bundle.join("|") + ")$");
+	else if(typeof bundle == "string") {
+		if(bundle == "*") return false;
+		else return new RegExp("^(" + bundle + ")$");
+	} else {
+		return typeof bundle == "object" && bundle.paths && getPaths(bundle.paths) || false;
+	}
+}
 
 function compile() {
 	Object.keys(config.bundles).forEach(name => {
 		var bundle = config.bundles[name];
-		if(typeof bundle == "string") {
-			if(bundle == "*") bundle = /.*/;
-			else bundle = new RegExp("^(" + bundle + ")$");
-		} else if(!(bundle instanceof RegExp)) {
-			if(bundle instanceof Array) bundle = new RegExp("^(" + bundle.join("|") + ")$");
-		}
-		var data = Object.assign({}, config);
+		var paths = getPaths(config.bundles[name]);
+		var data = Object.assign({}, config, typeof bundle == "object" ? bundle : {});
 		delete data.bundles;
 		var element = document.createElement("style");
 		var content = "";
-		fs.readdirSync(output).forEach(script => {
-			if(!bundle || bundle.test(script)) {
-				require(output + "/" + script.slice(0, -3))(element, data);
+		fs.readdirSync(dist).forEach(script => {
+			if(!paths || paths.test(script)) {
+				require(path.join(dist, script.slice(0, -3)))(element, data);
 				content += element.textContent;
 			}
 		});
@@ -65,7 +90,7 @@ function read(currFolder, paths) {
 						if(file.endsWith(".ssb")) {
 							writing++;
 							fs.writeFile(
-								path.join(output, paths.concat(file.slice(0, -3)).join("$") + "js"),
+								path.join(dist, paths.concat(file.slice(0, -3)).join("$") + "js"),
 								new Transpiler({filename: currFile}).transpile(`module.exports=function(@, {${args}}){<#ssb>${fs.readFileSync(currFile, "utf8")}</#ssb>}`).source.all
 							, () => {
 								if(--writing == 0) compile();
